@@ -4,6 +4,7 @@ pipeline {
     environment {
         DRIVER_DIR = "driver"
         DTS_DIR = "dts"
+        SCRIPTS_DIR = "scripts"
         LOG_DIR = "logs"
     }
 
@@ -39,11 +40,17 @@ pipeline {
 
         stage('Load/Unload Test') {
             steps {
-                sh '''
-                 ${DRIVER_DIR}/load_driver.sh
-                sleep 2
-                 ${DRIVER_DIR}/unload_driver.sh
-                '''
+                dir("${SCRIPTS_DIR}") {
+                    sh '''
+                    # Ensure scripts are executable
+                    chmod +x load_driver.sh unload_driver.sh
+
+                    # Run load/unload
+                    ./load_driver.sh
+                    sleep 2
+                    ./unload_driver.sh
+                    '''
+                }
             }
         }
 
@@ -69,3 +76,4 @@ pipeline {
         }
     }
 }
+
