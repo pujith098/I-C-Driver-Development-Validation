@@ -40,9 +40,9 @@ pipeline {
         stage('Load/Unload Test') {
             steps {
                 sh '''
-                sudo ${DRIVER_DIR}/load_driver.sh
+                 ${DRIVER_DIR}/load_driver.sh
                 sleep 2
-                sudo ${DRIVER_DIR}/unload_driver.sh
+                 ${DRIVER_DIR}/unload_driver.sh
                 '''
             }
         }
