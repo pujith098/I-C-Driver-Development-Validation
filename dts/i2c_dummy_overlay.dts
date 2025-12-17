@@ -1,0 +1,17 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2711";
+
+    fragment@0 {
+        target-path = "/";
+        __overlay__ {
+            i2c_dummy: i2c_dummy@0 {
+                compatible = "pujith,i2c-dummy";
+                status = "okay";
+            };
+        };
+    };
+};
+
