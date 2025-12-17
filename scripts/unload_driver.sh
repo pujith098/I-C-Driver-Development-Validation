@@ -1,4 +1,8 @@
 #!/bin/bash
+set -e
+
+echo "[UNLOAD] Unloading I2C dummy driver"
 rmmod i2c_dummy_driver
-chmod +x scripts/unload_driver.sh
+
+echo "[UNLOAD] Driver unloaded successfully"
 

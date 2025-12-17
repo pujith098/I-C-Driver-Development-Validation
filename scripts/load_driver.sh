@@ -1,4 +1,8 @@
 #!/bin/bash
-insmod driver/i2c_dummy_driver.ko
-chmod +x scripts/load_driver.sh
+set -e
+
+echo "[LOAD] Loading I2C dummy driver"
+insmod "$(dirname "$0")/../driver/i2c_dummy_driver.ko"
+
+echo "[LOAD] Driver loaded successfully"
 

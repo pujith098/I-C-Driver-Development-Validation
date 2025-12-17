@@ -2,77 +2,80 @@ pipeline {
     agent any
 
     environment {
-        DRIVER_DIR = "driver"
-        DTS_DIR = "dts"
+        DRIVER_DIR  = "driver"
+        DTS_DIR     = "dts"
         SCRIPTS_DIR = "scripts"
-        LOG_DIR = "logs"
+        LOG_DIR     = "logs"
     }
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout Source') {
             steps {
-                git branch: 'main',
-                    url: 'https://github.com/pujith098/I-C-Driver-Development-Validation.git'
+                checkout scm
             }
         }
 
-        stage('Build Driver') {
+        stage('Build Kernel Driver') {
             steps {
                 dir("${DRIVER_DIR}") {
                     sh '''
-                    make clean
-                    make
+                        echo "🔧 Cleaning build"
+                        make clean || true
+
+                        echo "🔧 Building kernel module"
+                        make
                     '''
                 }
             }
         }
 
-        stage('Build DT Overlay') {
+        stage('Build Device Tree Overlay') {
             steps {
                 dir("${DTS_DIR}") {
                     sh '''
-                    dtc -I dts -O dtb -o i2c_dummy.dtbo i2c_dummy_overlay.dts
+                        echo "🌳 Building DT overlay"
+                        dtc -I dts -O dtb -o i2c_dummy.dtbo i2c_dummy_overlay.dts
                     '''
                 }
             }
         }
 
-        stage('Load/Unload Test') {
-            steps {
-                dir("${SCRIPTS_DIR}") {
-                    sh '''
-                    # Ensure scripts are executable
-                    chmod +x load_driver.sh unload_driver.sh
-
-                    # Run load/unload
-                    ./load_driver.sh
-                    sleep 2
-                    ./unload_driver.sh
-                    '''
-                }
-            }
-        }
-
-        stage('Collect Logs') {
+        stage('Load / Unload Driver Test') {
             steps {
                 sh '''
-                mkdir -p ${LOG_DIR}
-                dmesg | tail -n 50 > ${LOG_DIR}/dmesg.log
+                    echo "🚀 Running load/unload test"
+
+                    chmod +x ${SCRIPTS_DIR}/load_driver.sh
+                    chmod +x ${SCRIPTS_DIR}/unload_driver.sh
+
+                    ${SCRIPTS_DIR}/load_driver.sh
+                    sleep 2
+                    ${SCRIPTS_DIR}/unload_driver.sh
+                '''
+            }
+        }
+
+        stage('Collect Kernel Logs') {
+            steps {
+                sh '''
+                    mkdir -p ${LOG_DIR}
+                    echo "📄 Collecting dmesg logs"
+                    dmesg | tail -n 100 > ${LOG_DIR}/dmesg.log
                 '''
             }
         }
     }
 
     post {
-        always {
-            archiveArtifacts artifacts: 'logs/**', fingerprint: true
+        success {
+            echo "✅ I2C Driver Validation SUCCESS"
         }
         failure {
-            echo "❌ Validation failed"
+            echo "❌ I2C Driver Validation FAILED"
         }
-        success {
-            echo "✅ Driver validated successfully"
+        always {
+            archiveArtifacts artifacts: 'logs/**', fingerprint: true
         }
     }
 }
