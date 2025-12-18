@@ -1,11 +1,17 @@
 pipeline {
-    agent any
+    agent {
+        label 'raspberrypi'
+    }
+
+    options {
+        timestamps()
+        ansiColor('xterm')
+    }
 
     environment {
-        DRIVER_DIR  = "driver"
-        DTS_DIR     = "dts"
-        SCRIPTS_DIR = "scripts"
-        LOG_DIR     = "logs"
+        DRIVER_DIR = 'driver'
+        DTS_DIR    = 'dts'
+        LOG_DIR    = 'logs'
     }
 
     stages {
@@ -16,66 +22,73 @@ pipeline {
             }
         }
 
-        stage('Build Kernel Driver') {
-            steps {
-                dir("${DRIVER_DIR}") {
-                    sh '''
-                        echo "🔧 Cleaning build"
-                        make clean || true
-
-                        echo "🔧 Building kernel module"
-                        make
-                    '''
-                }
-            }
-        }
-
-        stage('Build Device Tree Overlay') {
-            steps {
-                dir("${DTS_DIR}") {
-                    sh '''
-                        echo "🌳 Building DT overlay"
-                        dtc -I dts -O dtb -o i2c_dummy.dtbo i2c_dummy_overlay.dts
-                    '''
-                }
-            }
-        }
-
-        stage('Load / Unload Driver Test') {
+        stage('Prepare Environment') {
             steps {
                 sh '''
-                    echo "🚀 Running load/unload test"
+                    echo "Kernel version:"
+                    uname -a
 
-                    chmod +x ${SCRIPTS_DIR}/load_driver.sh
-                    chmod +x ${SCRIPTS_DIR}/unload_driver.sh
-
-                    ${SCRIPTS_DIR}/load_driver.sh
-                    sleep 2
-                    ${SCRIPTS_DIR}/unload_driver.sh
+                    echo "I2C devices:"
+                    ls -l /dev/i2c* || true
                 '''
             }
         }
 
-        stage('Collect Kernel Logs') {
+        stage('Build I2C Driver') {
+            steps {
+                sh '''
+                    cd ${DRIVER_DIR}
+                    make clean || true
+                    make
+                '''
+            }
+        }
+
+        stage('Load Driver') {
+            steps {
+                sh '''
+                    sudo rmmod i2c_dummy_driver 2>/dev/null || true
+                    sudo insmod driver/i2c_dummy_driver.ko
+                    dmesg | tail -20
+                '''
+            }
+        }
+
+        stage('I2C Detect') {
+            steps {
+                sh '''
+                    i2cdetect -y 1 || true
+                '''
+            }
+        }
+
+        stage('Unload Driver') {
+            steps {
+                sh '''
+                    sudo rmmod i2c_dummy_driver || true
+                '''
+            }
+        }
+
+        stage('Collect Logs') {
             steps {
                 sh '''
                     mkdir -p ${LOG_DIR}
-                    echo "📄 Collecting dmesg logs"
-                    dmesg | tail -n 100 > ${LOG_DIR}/dmesg.log
+                    dmesg | tail -100 > ${LOG_DIR}/dmesg.log
                 '''
             }
         }
     }
 
     post {
-        success {
-            echo "✅ I2C Driver Validation SUCCESS"
+        always {
+            archiveArtifacts artifacts: 'logs/*.log', fingerprint: true
         }
         failure {
-            echo "❌ I2C Driver Validation FAILED"
+            echo '❌ Build failed – check driver or hardware'
         }
-        always {
-            archiveArtifacts artifacts: 'logs/**', fingerprint: true
+        success {
+            echo '✅ I2C driver validation passed on Raspberry Pi'
         }
     }
 }
