@@ -5,7 +5,6 @@ pipeline {
 
     options {
         timestamps()
-        ansiColor('xterm')
     }
 
     environment {
@@ -25,10 +24,10 @@ pipeline {
         stage('Prepare Environment') {
             steps {
                 sh '''
-                    echo "Kernel version:"
+                    echo "===== SYSTEM INFO ====="
                     uname -a
 
-                    echo "I2C devices:"
+                    echo "===== I2C DEVICES ====="
                     ls -l /dev/i2c* || true
                 '''
             }
@@ -37,6 +36,7 @@ pipeline {
         stage('Build I2C Driver') {
             steps {
                 sh '''
+                    echo "===== BUILD DRIVER ====="
                     cd ${DRIVER_DIR}
                     make clean || true
                     make
@@ -47,8 +47,9 @@ pipeline {
         stage('Load Driver') {
             steps {
                 sh '''
+                    echo "===== LOAD DRIVER ====="
                     sudo rmmod i2c_dummy_driver 2>/dev/null || true
-                    sudo insmod driver/i2c_dummy_driver.ko
+                    sudo insmod ${DRIVER_DIR}/i2c_dummy_driver.ko
                     dmesg | tail -20
                 '''
             }
@@ -57,6 +58,7 @@ pipeline {
         stage('I2C Detect') {
             steps {
                 sh '''
+                    echo "===== I2C SCAN ====="
                     i2cdetect -y 1 || true
                 '''
             }
@@ -65,6 +67,7 @@ pipeline {
         stage('Unload Driver') {
             steps {
                 sh '''
+                    echo "===== UNLOAD DRIVER ====="
                     sudo rmmod i2c_dummy_driver || true
                 '''
             }
@@ -73,6 +76,7 @@ pipeline {
         stage('Collect Logs') {
             steps {
                 sh '''
+                    echo "===== COLLECT LOGS ====="
                     mkdir -p ${LOG_DIR}
                     dmesg | tail -100 > ${LOG_DIR}/dmesg.log
                 '''
@@ -85,10 +89,10 @@ pipeline {
             archiveArtifacts artifacts: 'logs/*.log', fingerprint: true
         }
         failure {
-            echo '❌ Build failed – check driver or hardware'
+            echo '❌ I2C validation failed'
         }
         success {
-            echo '✅ I2C driver validation passed on Raspberry Pi'
+            echo '✅ I2C validation passed on Raspberry Pi'
         }
     }
 }
