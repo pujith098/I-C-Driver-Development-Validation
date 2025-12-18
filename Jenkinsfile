@@ -5,11 +5,11 @@ pipeline {
 
     options {
         timestamps()
+        ansiColor('xterm')
     }
 
     environment {
         DRIVER_DIR = 'driver'
-        DTS_DIR    = 'dts'
         LOG_DIR    = 'logs'
     }
 
@@ -21,45 +21,59 @@ pipeline {
             }
         }
 
-        stage('Prepare Environment') {
+        stage('Setup Environment') {
             steps {
                 sh '''
-                    echo "===== SYSTEM INFO ====="
-                    uname -a
-
-                    echo "===== I2C DEVICES ====="
-                    ls -l /dev/i2c* || true
+                    mkdir -p logs/{build,integration,stress,fault,system}
+                    scripts/setup_env.sh
                 '''
             }
         }
 
-        stage('Build I2C Driver') {
+        stage('Build Driver') {
             steps {
                 sh '''
                     echo "===== BUILD DRIVER ====="
                     cd ${DRIVER_DIR}
-                    make clean || true
+                    make clean
                     make
                 '''
             }
         }
 
-        stage('Load Driver') {
+        stage('Load Driver & Overlay') {
             steps {
                 sh '''
                     echo "===== LOAD DRIVER ====="
-                    sudo rmmod i2c_dummy_driver 2>/dev/null || true
-                    sudo insmod ${DRIVER_DIR}/i2c_dummy_driver.ko
-                    dmesg | tail -20
+                    scripts/load_driver.sh
                 '''
             }
         }
 
-        stage('I2C Detect') {
+        stage('Integration Tests') {
             steps {
                 sh '''
-                    echo "===== I2C SCAN ====="
-                    i2cdetect -y 1 || true
+                    tests/integration/test_probe.sh
+                    tests/integration/test_write.sh
+                    tests/integration/test_read.sh
+                    tests/integration/test_rw_combined.sh
+                '''
+            }
+        }
+
+        stage('Stress Tests (10K Transfers)') {
+            steps {
+                sh '''
+                    tests/stress/i2c_stress_rw.sh
+                '''
+            }
+        }
+
+        stage('Fault Injection Tests') {
+            steps {
+                sh '''
+                    tests/fault/invalid_addr_test.sh
+                    tests/fault/no_slave_test.sh
                 '''
             }
         }
@@ -67,18 +81,7 @@ pipeline {
         stage('Unload Driver') {
             steps {
                 sh '''
-                    echo "===== UNLOAD DRIVER ====="
-                    sudo rmmod i2c_dummy_driver || true
-                '''
-            }
-        }
-
-        stage('Collect Logs') {
-            steps {
-                sh '''
-                    echo "===== COLLECT LOGS ====="
-                    mkdir -p ${LOG_DIR}
-                    dmesg | tail -100 > ${LOG_DIR}/dmesg.log
+                    scripts/unload_driver.sh
                 '''
             }
         }
@@ -86,13 +89,18 @@ pipeline {
 
     post {
         always {
-            archiveArtifacts artifacts: 'logs/*.log', fingerprint: true
+            sh '''
+                scripts/collect_logs.sh
+            '''
+            archiveArtifacts artifacts: 'logs/**', fingerprint: true
         }
-        failure {
-            echo '❌ I2C validation failed'
-        }
+
         success {
-            echo '✅ I2C validation passed on Raspberry Pi'
+            echo '✅ I2C DRIVER VALIDATION PASSED (REAL HARDWARE)'
+        }
+
+        failure {
+            echo '❌ I2C DRIVER VALIDATION FAILED'
         }
     }
 }
