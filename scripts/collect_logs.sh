@@ -1,4 +1,9 @@
 #!/bin/bash
-dmesg | tail -200 > logs/system/dmesg.log
-journalctl -k | tail -200 >> logs/system/kernel.log
+set -euo pipefail
+
+LOG_DIR="logs/system"
+mkdir -p "${LOG_DIR}"
+
+dmesg > "${LOG_DIR}/dmesg.log" || true
+journalctl -k --no-pager > "${LOG_DIR}/kernel.log" || true
 
