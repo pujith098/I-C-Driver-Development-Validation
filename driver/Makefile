@@ -1,6 +1,6 @@
-obj-m += i2c_dummy_driver.o
+obj-m += i2c_lcd_2004a.o
 
-KDIR ?= /lib/modules/$(shell uname -r)/build
+KDIR := /lib/modules/$(shell uname -r)/build
 PWD  := $(shell pwd)
 
 all:

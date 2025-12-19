@@ -10,8 +10,7 @@ static int lcd_send_cmd(struct i2c_client *client, u8 cmd)
     return i2c_smbus_write_byte(client, cmd);
 }
 
-static int lcd_probe(struct i2c_client *client,
-                      const struct i2c_device_id *id)
+static int lcd_probe(struct i2c_client *client)
 {
     dev_info(&client->dev, "2004A LCD detected at 0x%02x\n", client->addr);
 
@@ -28,10 +27,9 @@ static int lcd_probe(struct i2c_client *client,
     return 0;
 }
 
-static int lcd_remove(struct i2c_client *client)
+static void lcd_remove(struct i2c_client *client)
 {
     dev_info(&client->dev, "LCD removed\n");
-    return 0;
 }
 
 static const struct of_device_id lcd_of_match[] = {
@@ -51,7 +49,7 @@ static struct i2c_driver lcd_driver = {
         .name = DRIVER_NAME,
         .of_match_table = lcd_of_match,
     },
-    .probe = lcd_probe,
+    .probe  = lcd_probe,
     .remove = lcd_remove,
     .id_table = lcd_id,
 };
@@ -59,6 +57,6 @@ static struct i2c_driver lcd_driver = {
 module_i2c_driver(lcd_driver);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Pujit,Sneha");
+MODULE_AUTHOR("Pujit, Sneha");
 MODULE_DESCRIPTION("I2C LCD 2004A Driver");
 
