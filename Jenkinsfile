@@ -10,8 +10,8 @@ pipeline {
     environment {
         DRIVER_DIR = 'driver'
         LOG_DIR    = 'logs'
-        PATH      = "${env.PATH}:/usr/sbin:/sbin"  // Ensure i2cdetect is visible
-        I2C_BUS   = '/dev/i2c-1'                   // Default I2C bus on Raspberry Pi
+        PATH      = "${env.PATH}:/usr/sbin:/sbin"
+        I2C_BUS   = '/dev/i2c-1'
     }
 
     stages {
@@ -26,11 +26,10 @@ pipeline {
             steps {
                 sh '''
                     echo "===== SETUP ENV ====="
-                    mkdir -p logs/{build,integration,stress,fault,system}
+                    mkdir -p ${LOG_DIR}/{build,integration,stress,fault,system}
                     export PATH=$PATH:/usr/sbin:/sbin
                     scripts/setup_env.sh
 
-                    # Verify i2cdetect is available
                     if ! command -v i2cdetect >/dev/null 2>&1; then
                         echo "[ERROR] i2cdetect not found, cannot continue"
                         exit 1
@@ -44,6 +43,7 @@ pipeline {
                 sh '''
                     echo "===== BUILD DRIVER ====="
                     export PATH=$PATH:/usr/sbin:/sbin
+                    mkdir -p ${LOG_DIR}/build
                     cd ${DRIVER_DIR}
                     make clean
                     make
@@ -66,12 +66,12 @@ pipeline {
                 sh '''
                     echo "===== INTEGRATION TESTS ====="
                     export PATH=$PATH:/usr/sbin:/sbin
+                    mkdir -p ${LOG_DIR}/integration
 
-                    # Provide I2C bus explicitly
-                    tests/integration/test_probe.sh ${I2C_BUS}
-                    tests/integration/test_write.sh ${I2C_BUS}
-                    tests/integration/test_read.sh ${I2C_BUS}
-                    tests/integration/test_rw_combined.sh ${I2C_BUS}
+                    tests/integration/test_probe.sh ${I2C_BUS} ${LOG_DIR}/integration
+                    tests/integration/test_write.sh ${I2C_BUS} ${LOG_DIR}/integration
+                    tests/integration/test_read.sh ${I2C_BUS} ${LOG_DIR}/integration
+                    tests/integration/test_rw_combined.sh ${I2C_BUS} ${LOG_DIR}/integration
                 '''
             }
         }
@@ -81,7 +81,9 @@ pipeline {
                 sh '''
                     echo "===== STRESS TESTS ====="
                     export PATH=$PATH:/usr/sbin:/sbin
-                    tests/stress/i2c_stress_rw.sh ${I2C_BUS}
+                    mkdir -p ${LOG_DIR}/stress
+
+                    tests/stress/i2c_stress_rw.sh ${I2C_BUS} ${LOG_DIR}/stress
                 '''
             }
         }
@@ -91,8 +93,10 @@ pipeline {
                 sh '''
                     echo "===== FAULT TESTS ====="
                     export PATH=$PATH:/usr/sbin:/sbin
-                    tests/fault/invalid_addr_test.sh ${I2C_BUS}
-                    tests/fault/no_slave_test.sh ${I2C_BUS}
+                    mkdir -p ${LOG_DIR}/fault
+
+                    tests/fault/invalid_addr_test.sh ${I2C_BUS} ${LOG_DIR}/fault
+                    tests/fault/no_slave_test.sh ${I2C_BUS} ${LOG_DIR}/fault
                 '''
             }
         }
