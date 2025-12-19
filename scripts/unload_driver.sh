@@ -1,8 +1,6 @@
 #!/bin/bash
-set -e
+LOG=logs/build/unload_driver.log
 
-echo "[UNLOAD] Unloading I2C dummy driver"
-rmmod i2c_dummy_driver
-
-echo "[UNLOAD] Driver unloaded successfully"
+sudo dtoverlay -r i2c-lcd-2004a >> $LOG 2>&1 || true
+sudo rmmod i2c_lcd_2004a >> $LOG 2>&1 || true
 
