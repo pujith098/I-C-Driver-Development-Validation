@@ -10,8 +10,8 @@ pipeline {
     environment {
         DRIVER_DIR = 'driver'
         LOG_DIR    = 'logs'
-        PATH      = "${env.PATH}:/usr/sbin:/sbin"
-        I2C_BUS   = '/dev/i2c-1'
+        PATH      = "${env.PATH}:/usr/sbin:/sbin"  // Ensure i2cdetect is visible
+        I2C_BUS   = '/dev/i2c-1'                   // Default I2C bus on Raspberry Pi
     }
 
     stages {
@@ -28,12 +28,7 @@ pipeline {
                     echo "===== SETUP ENV ====="
                     mkdir -p ${LOG_DIR}/{build,integration,stress,fault,system}
                     export PATH=$PATH:/usr/sbin:/sbin
-                    scripts/setup_env.sh
-
-                    if ! command -v i2cdetect >/dev/null 2>&1; then
-                        echo "[ERROR] i2cdetect not found, cannot continue"
-                        exit 1
-                    fi
+                    scripts/setup_env.sh 2>&1 | tee ${LOG_DIR}/system/setup.log
                 '''
             }
         }
@@ -42,11 +37,10 @@ pipeline {
             steps {
                 sh '''
                     echo "===== BUILD DRIVER ====="
-                    export PATH=$PATH:/usr/sbin:/sbin
-                    mkdir -p ${LOG_DIR}/build
                     cd ${DRIVER_DIR}
-                    make clean
-                    make
+                    mkdir -p ../logs/build
+                    make clean 2>&1 | tee ../logs/build/make_clean.log
+                    make 2>&1 | tee ../logs/build/make_build.log
                 '''
             }
         }
@@ -55,8 +49,8 @@ pipeline {
             steps {
                 sh '''
                     echo "===== LOAD DRIVER ====="
-                    export PATH=$PATH:/usr/sbin:/sbin
-                    scripts/load_driver.sh
+                    mkdir -p ${LOG_DIR}/system
+                    scripts/load_driver.sh 2>&1 | tee ${LOG_DIR}/system/load_driver.log
                 '''
             }
         }
@@ -65,13 +59,12 @@ pipeline {
             steps {
                 sh '''
                     echo "===== INTEGRATION TESTS ====="
-                    export PATH=$PATH:/usr/sbin:/sbin
                     mkdir -p ${LOG_DIR}/integration
-
-                    tests/integration/test_probe.sh ${I2C_BUS} ${LOG_DIR}/integration
-                    tests/integration/test_write.sh ${I2C_BUS} ${LOG_DIR}/integration
-                    tests/integration/test_read.sh ${I2C_BUS} ${LOG_DIR}/integration
-                    tests/integration/test_rw_combined.sh ${I2C_BUS} ${LOG_DIR}/integration
+                    export PATH=$PATH:/usr/sbin:/sbin
+                    tests/integration/test_probe.sh ${I2C_BUS} 2>&1 | tee ${LOG_DIR}/integration/test_probe.log
+                    tests/integration/test_write.sh ${I2C_BUS} 2>&1 | tee ${LOG_DIR}/integration/test_write.log
+                    tests/integration/test_read.sh ${I2C_BUS} 2>&1 | tee ${LOG_DIR}/integration/test_read.log
+                    tests/integration/test_rw_combined.sh ${I2C_BUS} 2>&1 | tee ${LOG_DIR}/integration/test_rw_combined.log
                 '''
             }
         }
@@ -80,10 +73,9 @@ pipeline {
             steps {
                 sh '''
                     echo "===== STRESS TESTS ====="
-                    export PATH=$PATH:/usr/sbin:/sbin
                     mkdir -p ${LOG_DIR}/stress
-
-                    tests/stress/i2c_stress_rw.sh ${I2C_BUS} ${LOG_DIR}/stress
+                    export PATH=$PATH:/usr/sbin:/sbin
+                    tests/stress/i2c_stress_rw.sh ${I2C_BUS} 2>&1 | tee ${LOG_DIR}/stress/i2c_stress_rw.log
                 '''
             }
         }
@@ -92,11 +84,10 @@ pipeline {
             steps {
                 sh '''
                     echo "===== FAULT TESTS ====="
-                    export PATH=$PATH:/usr/sbin:/sbin
                     mkdir -p ${LOG_DIR}/fault
-
-                    tests/fault/invalid_addr_test.sh ${I2C_BUS} ${LOG_DIR}/fault
-                    tests/fault/no_slave_test.sh ${I2C_BUS} ${LOG_DIR}/fault
+                    export PATH=$PATH:/usr/sbin:/sbin
+                    tests/fault/invalid_addr_test.sh ${I2C_BUS} 2>&1 | tee ${LOG_DIR}/fault/invalid_addr_test.log
+                    tests/fault/no_slave_test.sh ${I2C_BUS} 2>&1 | tee ${LOG_DIR}/fault/no_slave_test.log
                 '''
             }
         }
@@ -105,8 +96,8 @@ pipeline {
             steps {
                 sh '''
                     echo "===== UNLOAD DRIVER ====="
-                    export PATH=$PATH:/usr/sbin:/sbin
-                    scripts/unload_driver.sh
+                    mkdir -p ${LOG_DIR}/system
+                    scripts/unload_driver.sh 2>&1 | tee ${LOG_DIR}/system/unload_driver.log
                 '''
             }
         }
@@ -114,10 +105,9 @@ pipeline {
 
     post {
         always {
+            echo "===== COLLECT LOGS ====="
             sh '''
-                echo "===== COLLECT LOGS ====="
-                export PATH=$PATH:/usr/sbin:/sbin
-                scripts/collect_logs.sh
+                scripts/collect_logs.sh 2>&1 | tee ${LOG_DIR}/system/collect_logs.log
             '''
             archiveArtifacts artifacts: 'logs/**', fingerprint: true
         }
