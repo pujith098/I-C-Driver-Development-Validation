@@ -5,7 +5,7 @@ pipeline {
 
     options {
         timestamps()
-        timeout(time: 90, unit: 'MINUTES')
+        timeout(time: 120, unit: 'MINUTES') // increase if needed for full tests
     }
 
     environment {
@@ -84,23 +84,22 @@ pipeline {
         stage('Run Validation Tests') {
             steps {
                 sh '''
-                    echo "===== VALIDATION TESTS ====="
+                    echo "===== RUN BASIC VALIDATION TESTS ====="
                     bash scripts/run_tests.sh
                 '''
             }
         }
-    }
 
-	stage('Run All Validation Tests') {
-    steps {
-        sh '''
-            echo "===== RUN ALL TESTS ====="
-            chmod +x scripts/run_all_tests.sh
-            bash scripts/run_all_tests.sh
-        '''
+        stage('Run All Validation Tests') {
+            steps {
+                sh '''
+                    echo "===== RUN FULL TEST SUITE ====="
+                    chmod +x scripts/run_all_tests.sh
+                    bash scripts/run_all_tests.sh
+                '''
+            }
+        }
     }
-}
-
 
     post {
         always {
