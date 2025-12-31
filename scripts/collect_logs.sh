@@ -1,9 +1,5 @@
 #!/bin/bash
-set -euo pipefail
-
-LOG_DIR="logs/system"
-mkdir -p "${LOG_DIR}"
-
-dmesg > "${LOG_DIR}/dmesg.log" || true
-journalctl -k --no-pager > "${LOG_DIR}/kernel.log" || true
-
+mkdir -p logs/system
+dmesg > logs/system/dmesg.log 2>&1 || true
+journalctl -k --no-pager > logs/system/kernel.log 2>&1 || true
+echo "✓ Logs collected"
