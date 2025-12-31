@@ -91,6 +91,17 @@ pipeline {
         }
     }
 
+	stage('Run All Validation Tests') {
+    steps {
+        sh '''
+            echo "===== RUN ALL TESTS ====="
+            chmod +x scripts/run_all_tests.sh
+            bash scripts/run_all_tests.sh
+        '''
+    }
+}
+
+
     post {
         always {
             sh '''
