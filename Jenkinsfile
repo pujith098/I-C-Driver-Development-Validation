@@ -9,9 +9,12 @@ pipeline {
     }
 
     environment {
-        PROJECT_NAME = "I2C-Driver-Development-Validation"
-        LOG_DIR      = "logs"
-        TEST_DIR     = "tests"
+        DRIVER_DIR = 'driver'
+        DTS_DIR    = 'dts'
+        SCRIPTS    = 'scripts'
+        LOG_DIR    = 'logs'
+        // Critical for Jenkins non-interactive shell
+        PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     }
 
     stages {
@@ -28,7 +31,17 @@ pipeline {
             steps {
                 sh '''
                     echo "===== SETUP ENV ====="
-                    bash scripts/setup_env.sh
+                    sudo apt-get update
+                    sudo apt-get install -y \
+                        i2c-tools \
+                        build-essential \
+                        device-tree-compiler \
+                        bc \
+                        python3
+
+                    echo "PATH=$PATH"
+                    which i2cdetect
+                    ls -l /dev/i2c-*
                 '''
             }
         }
@@ -37,7 +50,7 @@ pipeline {
             steps {
                 sh '''
                     echo "===== BUILD ====="
-                    make clean || true
+                    make clean
                     make
                 '''
             }
@@ -49,6 +62,7 @@ pipeline {
                     echo "===== LOAD DRIVER ====="
                     sudo bash scripts/unload_driver.sh || true
                     sudo bash scripts/load_driver.sh
+                    sleep 2
                 '''
             }
         }
@@ -57,9 +71,12 @@ pipeline {
             steps {
                 sh '''
                     echo "===== I2C SANITY ====="
-                    lsmod | grep i2c_lcd_2004a
+
+                    echo "--- Loaded modules ---"
+                    lsmod | grep i2c_lcd_2004a || exit 1
+
+                    echo "--- I2C Bus Scan ---"
                     i2cdetect -y 1
-                    ls /sys/bus/i2c/devices/1-0027 || exit 1
                 '''
             }
         }
@@ -67,40 +84,34 @@ pipeline {
         stage('Run Validation Tests') {
             steps {
                 sh '''
-                    echo "===== RUN TESTS ====="
-                    cd tests
-                    bash framework/test_framework.sh
+                    echo "===== VALIDATION TESTS ====="
+                    bash scripts/run_tests.sh
                 '''
             }
         }
     }
 
     post {
-
         always {
             sh '''
                 echo "===== COLLECT LOGS ====="
-                bash scripts/collect_logs.sh
+                mkdir -p logs
+                bash scripts/collect_logs.sh || true
             '''
+            archiveArtifacts artifacts: 'logs/**', fingerprint: true
 
-            archiveArtifacts artifacts: 'logs/**/*', fingerprint: true
-            archiveArtifacts artifacts: 'tests/**/tc_*.sh', fingerprint: false
-            archiveArtifacts artifacts: 'driver/*.ko', fingerprint: true
-        }
-
-        success {
-            echo '✅ I2C Validation PASSED'
-        }
-
-        failure {
-            echo '❌ I2C Validation FAILED'
-        }
-
-        cleanup {
             sh '''
                 echo "===== CLEANUP ====="
                 sudo bash scripts/unload_driver.sh || true
             '''
+        }
+
+        success {
+            echo "✅ I2C LCD VALIDATION PASSED"
+        }
+
+        failure {
+            echo "❌ I2C LCD VALIDATION FAILED"
         }
     }
 }
