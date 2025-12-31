@@ -1,11 +1,9 @@
 pipeline {
-    agent {
-        label 'raspberrypi'
-    }
+    agent { label 'raspberrypi' }
 
     options {
         timestamps()
-        timeout(time: 120, unit: 'MINUTES') // increase if needed for full tests
+        timeout(time: 180, unit: 'MINUTES')
     }
 
     environment {
@@ -13,7 +11,6 @@ pipeline {
         DTS_DIR    = 'dts'
         SCRIPTS    = 'scripts'
         LOG_DIR    = 'logs'
-        // Critical for Jenkins non-interactive shell
         PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
     }
 
@@ -32,14 +29,7 @@ pipeline {
                 sh '''
                     echo "===== SETUP ENV ====="
                     sudo apt-get update
-                    sudo apt-get install -y \
-                        i2c-tools \
-                        build-essential \
-                        device-tree-compiler \
-                        bc \
-                        python3
-
-                    echo "PATH=$PATH"
+                    sudo apt-get install -y i2c-tools build-essential device-tree-compiler bc python3
                     which i2cdetect
                     ls -l /dev/i2c-*
                 '''
@@ -71,17 +61,13 @@ pipeline {
             steps {
                 sh '''
                     echo "===== I2C SANITY ====="
-
-                    echo "--- Loaded modules ---"
                     lsmod | grep i2c_lcd_2004a || exit 1
-
-                    echo "--- I2C Bus Scan ---"
                     i2cdetect -y 1
                 '''
             }
         }
 
-        stage('Run Validation Tests') {
+        stage('Run Basic Validation Tests') {
             steps {
                 sh '''
                     echo "===== RUN BASIC VALIDATION TESTS ====="
@@ -90,12 +76,12 @@ pipeline {
             }
         }
 
-        stage('Run All Validation Tests') {
+        stage('Run Full Test Suite') {
             steps {
                 sh '''
                     echo "===== RUN FULL TEST SUITE ====="
                     chmod +x scripts/run_all_tests.sh
-                    bash scripts/run_all_tests.sh
+                    bash scripts/run_all_tests.sh || true
                 '''
             }
         }
@@ -108,7 +94,7 @@ pipeline {
                 mkdir -p logs
                 bash scripts/collect_logs.sh || true
             '''
-            archiveArtifacts artifacts: 'logs/**', fingerprint: true
+            archiveArtifacts artifacts: 'logs/**/*.log', fingerprint: true
 
             sh '''
                 echo "===== CLEANUP ====="

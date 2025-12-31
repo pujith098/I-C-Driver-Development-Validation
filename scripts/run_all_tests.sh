@@ -1,66 +1,38 @@
 #!/bin/bash
-# File: scripts/run_all_tests.sh
-set -e
-
-TEST_ROOT="tests"
-LOG_ROOT="logs"
-mkdir -p "$LOG_ROOT"
+# Run all tests, continue even if some fail
+set +e
 
 echo "===== RUNNING ALL I2C DRIVER TESTS ====="
 
-# Track failures
-FAIL_COUNT=0
+TOTAL=0
+PASSED=0
+FAILED=0
 
-# Function to run tests in a category
-run_category() {
-    local category=$1
-    local category_dir="${TEST_ROOT}/${category}"
-    local log_dir="${LOG_ROOT}/${category}"
-    mkdir -p "$log_dir"
-
+for category in framework controller edge_cases hardware integration slave negative stress; do
     echo ">>> Running tests in category: $category"
-
-    for test_script in "$category_dir"/*.sh; do
-        [ -f "$test_script" ] || continue
-        test_name=$(basename "$test_script")
-        echo "--- Running $test_name ---"
-        set +e
-        bash "$test_script" &> "${log_dir}/${test_name%.sh}.log"
-        RESULT=$?
-        set -e
-
-        if [ $RESULT -eq 0 ]; then
-            echo "✓ $test_name PASSED"
+    mkdir -p logs/$category
+    for test_script in tests/$category/*.sh; do
+        TOTAL=$((TOTAL + 1))
+        echo "--- Running $(basename $test_script) ---"
+        bash $test_script > logs/$category/$(basename $test_script).log 2>&1
+        rc=$?
+        if [ $rc -eq 0 ]; then
+            echo "✓ $(basename $test_script) PASSED"
+            PASSED=$((PASSED + 1))
         else
-            echo "❌ $test_name FAILED (see ${log_dir}/${test_name%.sh}.log)"
-            FAIL_COUNT=$((FAIL_COUNT+1))
+            echo "❌ $(basename $test_script) FAILED (see logs/$category/$(basename $test_script).log)"
+            FAILED=$((FAILED + 1))
         fi
     done
-}
-
-# Define the test categories in order
-CATEGORIES=(
-    "framework"
-    "controller"
-    "edge_cases"
-    "hardware"
-    "integration"
-    "slave"
-    "negative"
-    "stress"
-)
-
-# Run all categories
-for category in "${CATEGORIES[@]}"; do
-    run_category "$category"
 done
 
-# Summary
 echo "===== TEST SUMMARY ====="
-if [ $FAIL_COUNT -eq 0 ]; then
-    echo "All tests PASSED ✅"
-else
-    echo "$FAIL_COUNT test(s) FAILED ❌"
+echo "Total tests: $TOTAL"
+echo "Passed: $PASSED"
+echo "Failed: $FAILED"
+
+# Return non-zero if any test failed
+if [ $FAILED -gt 0 ]; then
     exit 1
 fi
 
