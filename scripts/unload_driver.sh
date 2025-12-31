@@ -1,4 +1,11 @@
 #!/bin/bash
-sudo dtoverlay -r i2c-lcd-2004a-overlay 2>/dev/null || true
-sudo rmmod i2c_lcd_2004a 2>/dev/null || true
-echo "✓ Driver unloaded"
+
+MOD_NAME="i2c_lcd_2004a"
+
+if lsmod | grep -q "$MOD_NAME"; then
+    sudo rmmod "$MOD_NAME"
+    echo "✓ Driver unloaded"
+else
+    echo "✓ Driver not loaded"
+fi
+
