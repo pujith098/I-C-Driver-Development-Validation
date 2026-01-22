@@ -13,7 +13,7 @@ fi
 echo "✓ Driver loaded"
 
 # 2. Check I2C device present
-if ! i2cdetect -y 1 | grep -q "27"; then
+if ! i2cdetect -y 1 | grep -q "UU"; then
     echo "❌ LCD not detected on I2C bus"
     exit 1
 fi
